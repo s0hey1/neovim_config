@@ -2,9 +2,11 @@
 "-----------------general----------------
 set encoding=utf-8
 set termbidi
-set guifont=Monospace:h12
-" set guifont=Hack:h17
+" set guifont=Monospace:h12
+"set guifont=Hack\ Nerd\ Font:h11
+set guifont=Fira\ Mono:h10
 syntax on
+filetype on
 filetype plugin indent on
 set termguicolors
 " show existing tab with 4 spaces width
@@ -31,6 +33,15 @@ let mapleader=" "
 
 set number relativenumber
 
+"fast change dir
+"set autochdir
+" autocmd BufEnter * silent! lcd %:p:h
+command CDC cd %:p:h
+nnoremap <silent><leader>cd :cd %:p:h<CR>:pwd<CR>
+
+set nohlsearch
+au TermClose * call feedkeys("i")
+
 augroup numbertoggle
   autocmd!
   autocmd BufEnter,FocusGained,InsertLeave * set relativenumber
@@ -38,8 +49,11 @@ augroup numbertoggle
   autocmd BufLeave,FocusLost,InsertEnter   * set relativenumber
 augroup END
 
+
 "--------------------------neovide setup--------------------------------
-let g:neovide_cursor_vfx_mode = "railgun"
+" let g:neovide_cursor_vfx_mode = "railgun" //buggy
+" let g:neovide_cursor_vfx_mode = "torpedo" //byggy
+let g:neovide_cursor_vfx_mode = "pixiedust"
 
 "-----------------vim-Plug pacman-------------
 "Plug pkgman
@@ -94,7 +108,7 @@ Plug 'onsails/lspkind-nvim'
 "lsp signature , for function signature
 Plug 'ray-x/lsp_signature.nvim'
 "lsp language server installer
-Plug 'kabouzeid/nvim-lspinstall'
+Plug 'williamboman/nvim-lsp-installer'
 "lsp rooter , change current dir to project root
 Plug 'ahmedkhalf/lsp-rooter.nvim'
 "code completions
@@ -223,12 +237,14 @@ Plug 'skywind3000/asyncrun.vim'
 "read and write file with sudo
 Plug 'lambdalisue/suda.vim' 
 
+"---------tmux-----------
+Plug 'preservim/vimux'
 
 call plug#end()
 
 "---------theme---------
-set background=dark
-"set background=light
+"set background=dark
+set background=light
 "colorscheme PaperColor
 "colorscheme dracula
 "colorscheme solarized
@@ -246,7 +262,7 @@ set background=dark
 " })
 " EOF
 
-autocmd vimenter * ++nested colorscheme gruvbox-material
+autocmd vimenter * ++nested colorscheme solarized8_high 
 "one halfdark
 "set t_Co=256
 "let g:airline_theme='sonokai'
@@ -284,7 +300,7 @@ let g:airline_symbols.branch = ''
 let g:airline_symbols.readonly = ''
 let g:airline_symbols.linenr = '☰ '
 let g:airline_symbols.maxlinenr = ''
-let g:airline_symbols.dirty='⚡'
+let g:airline_symbols.dirty=' ⚡'
 
 let g:airline_detect_modified=1
 let g:airline_detect_paste=1
@@ -309,12 +325,21 @@ require'nvim-treesitter.configs'.setup {
   fold = {
     enable = true,
   },
+  incremental_selection = {
+    enable = true,
+    keymaps = {
+      init_selection = "gnn",
+      node_incremental = "grn",
+      scope_incremental = "grc",
+      node_decremental = "grm",
+    },
+  },
 }
 EOF
 "folding setup
-set foldmethod=expr
-set foldexpr=nvim_treesitter#foldexpr()
-au BufRead * normal zR
+"set foldmethod=expr
+"set foldexpr=nvim_treesitter#foldexpr()
+"au BufRead * normal zR
 "set nofoldenable
 
 "treesitter status
@@ -344,7 +369,7 @@ require'nvim-treesitter.configs'.setup {
     select = {
       enable = true,
 
-      -- Automatically jump forward to textobj, similar to targets.vim 
+      -- Automatically jump forward to textobj, similar to targets.vim
       lookahead = true,
 
       keymaps = {
@@ -353,14 +378,6 @@ require'nvim-treesitter.configs'.setup {
         ["if"] = "@function.inner",
         ["ac"] = "@class.outer",
         ["ic"] = "@class.inner",
-
-        -- Or you can define your own textobjects like this
-        ["iF"] = {
-          python = "(function_definition) @function",
-          cpp = "(function_definition) @function",
-          c = "(function_definition) @function",
-          java = "(method_declaration) @function",
-        },
       },
     },
     swap = {
@@ -372,7 +389,6 @@ require'nvim-treesitter.configs'.setup {
         ["<leader>A"] = "@parameter.inner",
       },
     },
-
     move = {
       enable = true,
       set_jumps = true, -- whether to set jumps in the jumplist
@@ -393,13 +409,12 @@ require'nvim-treesitter.configs'.setup {
         ["[]"] = "@class.outer",
       },
     },
-
     lsp_interop = {
       enable = true,
       border = 'none',
       peek_definition_code = {
-        ["df"] = "@function.outer",
-        ["dF"] = "@class.outer",
+        ["<leader>df"] = "@function.outer",
+        ["<leader>dF"] = "@class.outer",
       },
     },
   },
@@ -480,8 +495,7 @@ local function make_config(lsp_status, server)
 end
 
 local function setup_servers()
-  require'lspinstall'.setup()
-  local servers = require'lspinstall'.installed_servers()
+  local lsp_installer = require('nvim-lsp-installer')
   local lsp_status = require('lsp-status')
   lsp_status.register_progress()
   --snip support for nvim-compe
@@ -493,9 +507,21 @@ local function setup_servers()
         'additionalTextEdits',
       }
   }
-  for _, server in pairs(servers) do
-      require'lspconfig'[server].setup(make_config(lsp_status, server))
-  end
+  --for _, server in pairs(servers) do
+  --    require'lspconfig'[server].setup(make_config(lsp_status, server))
+  --end
+  lsp_installer.on_server_ready(function(server)
+    local opts = make_config(lsp_status, server) 
+
+    -- (optional) Customize the options passed to the server
+    -- if server.name == "tsserver" then
+    --     opts.root_dir = function() ... end
+    -- end
+
+    -- This setup() function is exactly the same as lspconfig's setup function.
+    -- Refer to https://github.com/neovim/nvim-lspconfig/blob/master/doc/server_configurations.md
+    server:setup(opts)
+  end)
 
   --lspinstall not supported 
   --require'lspconfig'.dartls.setup({
@@ -523,6 +549,7 @@ local function setup_servers()
       --  enabled = true -- set to false to disable
       --},
       dev_log = {
+          enabled = false,
         open_cmd = "tabedit", -- command to use to open the log buffer
       },
       dev_tools = {
@@ -548,10 +575,10 @@ end
 setup_servers()
 
 -- Automatically reload after `:LspInstall <server>` so we don't have to restart neovim
-require'lspinstall'.post_install_hook = function ()
-  setup_servers() -- reload installed servers
-  vim.cmd("bufdo e") -- this triggers the FileType autocmd that starts the server
-end
+--require'lspinstall'.post_install_hook = function ()
+--  setup_servers() -- reload installed servers
+--  vim.cmd("bufdo e") -- this triggers the FileType autocmd that starts the server
+--end
 
 EOF
 
@@ -559,9 +586,10 @@ EOF
 lua <<EOF
 local servers_alias = {
     ['cpp'] = 'clangd',
+ --   ['clangd'] = 'clangd',
     [ 'c' ] = 'clangd',
     [ 'go' ] = 'gopls',
-    [ 'rust' ] = 'rust_analyzer',
+  --  [ 'rust_analyzer' ] = 'rust_analyzer',
     [ 'bash' ] = 'bashls',
     [ 'cmake' ] = 'cmakels',
     [ 'css' ] = 'cssls',
@@ -597,14 +625,16 @@ function get_lsp_progress()
   local buf_clients = {}
     --local clients = vim.tbl_values(vim.lsp.get_active_clients())
    for _, c in pairs(vim.lsp.buf_get_clients()) do
-       if servers_alias[c.name] ~= nil then
-           buf_clients[servers_alias[c.name]]= '' 
-       end
+ --      if servers_alias[c.name] ~= nil then
+ --          buf_clients[servers_alias[c.name]]= '' 
+ --      end
+       buf_clients[c.name]= '' 
    end
     local contents = ''
     local txt = ''
   for _, msg in pairs(buf_messages) do
-    local name = servers_alias[msg.name] or 'not_found'
+    --local name = servers_alias[msg.name] or 'not_found'
+    local name = msg.name
     if buf_clients[name] ~= nil then
         if msg.progress or (msg.status and curr_content ~= msg.content) then
             contents = config.spinner_frames[(spinner_frame_counter % #config.spinner_frames) + 1] 
@@ -660,7 +690,7 @@ function get_lsp_diag_others()
         if #diags > 0 then  
             diags = diags .. ' '
         end
-        diags = diags .. '🛈 '..buf_diag.info
+        diags = diags .. ' '..buf_diag.info
     end
     if buf_diag.hints > 0 then 
         if #diags > 0 then  
@@ -692,9 +722,18 @@ function! LspDiags_others() abort
     return '' 
 endfunction
 lua << EOF
-local signs = { Error = " ", Warning = " ", Hint = " ", Information = " " }
+
+vim.diagnostic.config({
+  virtual_text = true,
+  signs = true,
+  underline = true,
+  update_in_insert = false,
+  severity_sort = false,
+})
+
+local signs = { Error = " ", Warn = " ", Hint = " ", Info = " " }
 for type, icon in pairs(signs) do
-  local hl = "LspDiagnosticsSign" .. type
+  local hl = "DiagnosticSign" .. type
   vim.fn.sign_define(hl, { text = icon, texthl = hl, numhl = "" })
 end
 EOF
@@ -776,7 +815,12 @@ require('lspkind').init({
     -- enables text annotations
     --
     -- default: true
-    with_text = true,
+    --with_text = true,
+
+    -- defines how annotations are shown
+    -- default: symbol
+    -- options: 'text', 'text_symbol', 'symbol_text', 'symbol'
+    mode = 'symbol_text',
 
     -- default symbol map
     -- can be either 'default' or
@@ -915,7 +959,6 @@ vim.api.nvim_set_keymap('i', '<c-e>', 'compe#close("<C-e>")', { expr = true })
 --vim.api.nvim_set_keymap('i', '<c-d>', 'compe#scroll({"delta": -4})', { expr = true })
 
 EOF
-
 "--------------------trouble nvim setup------------------
 "
 " Trouble [mode]: open the list
@@ -929,7 +972,7 @@ require("trouble").setup{
     height = 10, -- height of the trouble list when position is top or bottom
     width = 50, -- width of the list when position is left or right
     icons = true, -- use devicons for filenames
-    mode = "lsp_workspace_diagnostics", -- "lsp_workspace_diagnostics", "lsp_document_diagnostics", "quickfix", "lsp_references", "loclist"
+    mode = "workspace_diagnostics", -- "lsp_workspace_diagnostics", "lsp_document_diagnostics", "quickfix", "lsp_references", "loclist"
     fold_open = "", -- icon used for open folds
     fold_closed = "", -- icon used for closed folds
     action_keys = { -- key mappings for actions in the trouble list
@@ -998,7 +1041,8 @@ require("luasnip").config.set_config({
 	-- Update more often, :h events for more info.
 	updateevents = "TextChanged,TextChangedI",
 })
-require("luasnip/loaders/from_vscode").lazy_load({ paths = {"../friendly-snippets"}})
+require("luasnip.loaders.from_vscode").lazy_load({ paths = {"./friendly-snippets"}})
+--require("luasnip.loaders.from_vscode").lazy_load({ paths = { "./snippets" } })
 EOF
 
 
@@ -1063,19 +1107,18 @@ require('gitsigns').setup {
     ['o ih'] = ':<C-U>lua require"gitsigns.actions".select_hunk()<CR>',
     ['x ih'] = ':<C-U>lua require"gitsigns.actions".select_hunk()<CR>'
   },
-  watch_index = {
+  watch_gitdir = {
     interval = 1000,
     follow_files = true
   },
-  current_line_blame = false,
-  current_line_blame_delay = 1000,
-  current_line_blame_position = 'eol',
-  sign_priority = 6,
-  update_debounce = 100,
-  status_formatter = nil, -- Use default
-  word_diff = false,
-  use_decoration_api = true,
-  use_internal_diff = true,  -- If luajit is present
+     current_line_blame = false,
+     sign_priority = 6,
+     update_debounce = 100,
+     status_formatter = nil, -- Use default
+     word_diff = false,
+     diff_opts={
+        internal = true,
+     }
 }
 EOF
 
@@ -1099,10 +1142,7 @@ local cb = require'diffview.config'.diffview_callback
 
 require'diffview'.setup {
   diff_binaries = false,    -- Show diffs for binaries
-  file_panel = {
-    width = 35,
-    use_icons = true        -- Requires nvim-web-devicons
-  },
+  use_icons = true ,       -- Requires nvim-web-devicons
   key_bindings = {
     disable_defaults = false,                   -- Disable the default key bindings
     -- The `view` bindings are active in the diff buffers, only when the current
@@ -1382,21 +1422,21 @@ tnoremap <C-w>l <C-\><C-N><C-w>l
 tnoremap <C-w><C-w> <C-\><C-N><C-w><C-w>
 tnoremap <leader><C-\> <cmd>ToggleTermOpenAll<CR>
 tnoremap <leader><C-\><C-\> <cmd>ToggleTermCloseAll<CR>
-inoremap <C-w>h <C-\><C-N><C-w>h
-inoremap <C-w>j <C-\><C-N><C-w>j
-inoremap <C-w>k <C-\><C-N><C-w>k
-inoremap <C-w>l <C-\><C-N><C-w>l
-inoremap <C-w><C-w> <C-\><C-N><C-w><C-w>
-inoremap <silent><leader><C-\> <Esc><Cmd>ToggleTermOpenAll<CR>
+" inoremap <C-w>h <C-\><C-N><C-w>h
+" inoremap <C-w>j <C-\><C-N><C-w>j
+" inoremap <C-w>k <C-\><C-N><C-w>k
+" inoremap <C-w>l <C-\><C-N><C-w>l
+" inoremap <C-w><C-w> <C-\><C-N><C-w><C-w>
+" inoremap <silent><leader><C-\> <Esc><Cmd>ToggleTermOpenAll<CR>
 nnoremap <silent><leader><C-\> <Cmd>ToggleTermOpenAll<CR>
-inoremap <silent><leader><C-\><C-\> <Esc><Cmd>ToggleTermCloseAll<CR>
+" inoremap <silent><leader><C-\><C-\> <Esc><Cmd>ToggleTermCloseAll<CR>
 nnoremap <silent><leader><C-\><C-\> <Cmd>ToggleTermCloseAll<CR>
 """""""""""""""""""""""""""""""""""termdebug plugin"""""""""""""""""""""""""""""""""""
 "----------------------dap setup--------------------------
 "-----------------------dap ui setup----------------------
 "
 lua <<EOF
-require("dapui").setup({
+require('dapui').setup{
   icons = {
     expanded = "▾",
     collapsed = "▸"
@@ -1408,33 +1448,32 @@ require("dapui").setup({
     remove = "d",
     edit = "e",
   },
-  sidebar = {
-    open_on_start = true,
-    elements = {
-      -- You can change the order of elements in the sidebar
-      "scopes",
-      "breakpoints",
-      "stacks",
-      "watches"
+  layouts = {
+    {
+      elements = {
+        'scopes',
+        'breakpoints',
+        'stacks',
+        'watches',
+      },
+      size = 40,
+      position = 'left',
     },
-    width = 40,
-    position = "left" -- Can be "left" or "right"
-  },
-  tray = {
-    open_on_start = true,
-    elements = {
-      "repl"
+    {
+      elements = {
+        'repl',
+        'console',
+      },
+      size = 10,
+      position = 'bottom',
     },
-    height = 10,
-    position = "bottom" -- Can be "bottom" or "top"
   },
   floating = {
     max_height = nil, -- These can be integers or a float between 0 and 1.
-    max_width = nil   -- Floats will be treated as percentage of your screen.
-  }
-})
-
-require('dap.ext.vscode').load_launchjs()
+    max_width = nil,   -- Floats will be treated as percentage of your screen.
+  },
+}
+--require('dap.ext.vscode').load_launchjs()
 
 EOF
 
@@ -1447,7 +1486,12 @@ lua <<EOF
 --for debugger, _ in pairs(dbg_list) do
 --	dap_install.config(debugger, {})
 --end
-local dap = require('dap')
+local dap, dapui = require('dap'), require('dapui')
+dap.listeners.after.event_initialized['dapui_config'] = function() dapui.open() end
+dap.listeners.before.event_terminated['dapui_config'] = function() dapui.close() end
+dap.listeners.before.event_exited['dapui_config'] = function() dapui.close() end
+
+---local dap = require('dap')
 dap.adapters.lldb = {
   type = 'executable',
   command = '/usr/bin/lldb-vscode', -- adjust as needed
@@ -1585,10 +1629,10 @@ dap.configurations.dart = {
 }
 
 EOF
-nnoremap <silent> <leader>d1 :lua require'dap'.continue()<CR>
-nnoremap <silent> <leader>d2 :lua require'dap'.step_over()<CR>
-nnoremap <silent> <leader>d3 :lua require'dap'.step_into()<CR>
-nnoremap <silent> <leader>d4 :lua require'dap'.step_out()<CR>
+nnoremap <silent> <F5> :lua require'dap'.continue()<CR>
+nnoremap <silent> <F6> :lua require'dap'.step_over()<CR>
+nnoremap <silent> <F7> :lua require'dap'.step_into()<CR>
+nnoremap <silent> <F8> :lua require'dap'.step_out()<CR>
 nnoremap <silent> <leader>b :lua require'dap'.toggle_breakpoint()<CR>
 nnoremap <silent> <leader>B :lua require'dap'.set_breakpoint(vim.fn.input('Breakpoint condition: '))<CR>
 nnoremap <silent> <leader>lp :lua require'dap'.set_breakpoint(nil, nil, vim.fn.input('Log point message: '))<CR>
@@ -1621,40 +1665,40 @@ inoremap <expr> <c-x><c-k> fzf#vim#complete#word({'window': { 'width': 0.2, 'hei
 "---------------------hop setup-------------------------
 lua <<EOF
 require'hop'.setup()
-vim.api.nvim_set_keymap('n', '<leader>hs', "<cmd>lua require'hop'.hint_char1()<cr>", {})
-vim.api.nvim_set_keymap('n', '<leader>hS', "<cmd>lua require'hop'.hint_char2()<cr>", {})
-vim.api.nvim_set_keymap('n', '<leader>hw', "<cmd>lua require'hop'.hint_words()<cr>", {})
-vim.api.nvim_set_keymap('n', '<leader>hl', "<cmd>lua require'hop'.hint_lines()<cr>", {})
-vim.api.nvim_set_keymap('n', '<leader>hp', "<cmd>lua require'hop'.hint_patterns()<cr>", {})
+vim.api.nvim_set_keymap('n', '<leader>s', "<cmd>lua require'hop'.hint_char1()<cr>", {})
+vim.api.nvim_set_keymap('n', '<leader>S', "<cmd>lua require'hop'.hint_char2()<cr>", {})
+vim.api.nvim_set_keymap('n', '<leader>w', "<cmd>lua require'hop'.hint_words()<cr>", {})
+vim.api.nvim_set_keymap('n', '<leader>l', "<cmd>lua require'hop'.hint_lines()<cr>", {})
+vim.api.nvim_set_keymap('n', '<leader>p', "<cmd>lua require'hop'.hint_patterns()<cr>", {})
 EOF
 
 
 "-----------------------------nvim tree setup------------------------------
 let g:nvim_tree_side = 'left' "left by default
 let g:nvim_tree_width = 30 "30 by default, can be width_in_columns or 'width_in_percent%'
-let g:nvim_tree_ignore = [ '.git', 'node_modules', '.cache' ] "empty by default
-let g:nvim_tree_gitignore = 1 "0 by default
-let g:nvim_tree_auto_open = 0 "0 by default, opens the tree when typing `vim $DIR` or `vim`
-let g:nvim_tree_auto_close = 1 "0 by default, closes the tree when it's the last window
+let g:tree_ignore = [ '.git', 'node_modules', '.cache' ] "empty by default
+let g:tree_gitignore = 1 "0 by default
+let g:tree_auto_open = 0 "0 by default, opens the tree when typing `vim $DIR` or `vim`
+let g:tree_auto_close = 1 "0 by default, closes the tree when it's the last window
 let g:nvim_tree_auto_ignore_ft = [] "empty by default, don't auto open tree on specific filetypes.
 let g:nvim_tree_quit_on_open = 1 "0 by default, closes the tree when you open a file
-let g:nvim_tree_follow = 1 "0 by default, this option allows the cursor to be updated when entering a buffer
+let g:tree_follow = 1 "0 by default, this option allows the cursor to be updated when entering a buffer
 let g:nvim_tree_indent_markers = 1 "0 by default, this option shows indent markers when folders are open
-let g:nvim_tree_hide_dotfiles = 1 "0 by default, this option hides files and folders starting with a dot `.`
+let g:tree_hide_dotfiles = 1 "0 by default, this option hides files and folders starting with a dot `.`
 let g:nvim_tree_git_hl = 1 "0 by default, will enable file highlight for git attributes (can be used without the icons).
 let g:nvim_tree_highlight_opened_files = 1 "0 by default, will enable folder and file icon highlight for opened files/directories.
 let g:nvim_tree_root_folder_modifier = ':~' "This is the default. See :help filename-modifiers for more options
-let g:nvim_tree_tab_open = 1 "0 by default, will open the tree when entering a new tab and the tree was previously open
-let g:nvim_tree_auto_resize = 1 "1 by default, will resize the tree to its saved width when opening a file
-let g:nvim_tree_disable_netrw = 1 "1 by default, disables netrw
-let g:nvim_tree_hijack_netrw = 1 "1 by default, prevents netrw from automatically opening when opening directories (but lets you keep its other utilities)
+let g:tree_tab_open = 1 "0 by default, will open the tree when entering a new tab and the tree was previously open
+let g:tree_auto_resize = 1 "1 by default, will resize the tree to its saved width when opening a file
+let g:tree_disable_netrw = 0 "1 by default, disables netrw
+let g:tree_hijack_netrw = 0 "1 by default, prevents netrw from automatically opening when opening directories (but lets you keep its other utilities)
 let g:nvim_tree_add_trailing = 0 "0 by default, append a trailing slash to folder names
 let g:nvim_tree_group_empty = 0 " 0 by default, compact folders that only contain a single folder into one node in the file tree
-let g:nvim_tree_lsp_diagnostics = 0 "0 by default, will show lsp diagnostics in the signcolumn. See :help nvim_tree_lsp_diagnostics
+let g:tree_lsp_diagnostics = 0 "0 by default, will show lsp diagnostics in the signcolumn. See :help nvim_tree_lsp_diagnostics
 let g:nvim_tree_disable_window_picker = 0 "0 by default, will disable the window picker.
-let g:nvim_tree_hijack_cursor = 0 "1 by default, when moving cursor in the tree, will position the cursor at the start of the file on the current line
+let g:tree_hijack_cursor = 0 "1 by default, when moving cursor in the tree, will position the cursor at the start of the file on the current line
 let g:nvim_tree_icon_padding = ' ' "one space by default, used for rendering the space between the icon and the filename. Use with caution, it could break rendering if you set an empty string depending on your font.
-let g:nvim_tree_update_cwd = 0 "0 by default, will update the tree cwd when changing nvim's directory (DirChanged event). Behaves strangely with autochdir set.
+let g:tree_update_cwd = 0 "0 by default, will update the tree cwd when changing nvim's directory (DirChanged event). Behaves strangely with autochdir set.
 let g:nvim_tree_window_picker_exclude = {
     \   'filetype': [
     \     'packer',
@@ -1802,4 +1846,11 @@ let g:minimap_width = 10
 " let g:minimap_auto_start_win_enter = 1
 
 
+"--------------------------auto-session setup-----------------------------
+lua <<EOF
+require('auto-session').setup {
+    auto_session_enable_last_session=false,
+    auto_restore_enable=false
+}
+EOF
 
