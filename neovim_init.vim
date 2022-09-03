@@ -190,6 +190,8 @@ Plug 'folke/todo-comments.nvim'
 "Plug 'JoosepAlviste/nvim-ts-context-commentstring'
 "treesitter based comment, main comment 1
 Plug 'numToStr/Comment.nvim'
+"multicourser
+Plug 'mg979/vim-visual-multi', {'branch': 'master'}
 
 "autopair
 Plug 'windwp/nvim-autopairs'
@@ -247,6 +249,9 @@ Plug 'rmagatti/auto-session'
 "switch session based telescope
 Plug 'rmagatti/session-lens'  
 
+"---------project management-----
+Plug 'ahmedkhalf/project.nvim'
+
 "---------command---------
 "async make
 Plug 'neomake/neomake'
@@ -257,6 +262,10 @@ Plug 'lambdalisue/suda.vim'
 
 "---------tmux-----------
 Plug 'preservim/vimux'
+
+"---------live server bracey--------
+"if not working, install dependencies manually
+Plug 'turbio/bracey.vim', { 'do': 'npm install --prefix server;pip3 install pynvim'}
 
 call plug#end()
 
@@ -519,14 +528,15 @@ EOF
 
 "---------------------lsp setup----------------------
 lua << EOF
-local function make_config(lsp_status, server)
+local function make_config(lsp_status, server, capabilities)
     local on_attach = function(client, bufnr)
       local function buf_set_keymap(...) vim.api.nvim_buf_set_keymap(bufnr, ...) end
       local function buf_set_option(...) vim.api.nvim_buf_set_option(bufnr, ...) end
 
       --Enable completion triggered by <c-x><c-o>
       buf_set_option('omnifunc', 'v:lua.vim.lsp.omnifunc')
-
+      buf_set_option("formatexpr", "v:lua.vim.lsp.formatexpr()")
+	  buf_set_option("tagfunc", "v:lua.vim.lsp.tagfunc")
       -- Mappings.
       local opts = { noremap=true, silent=true }
 
@@ -571,7 +581,7 @@ local function make_config(lsp_status, server)
             clangdFileStatus = true
           },
           on_attach = on_attach,
-          capabilities = lsp_status.capabilities,
+          capabilities = capabilities,
           flags = {
               debounce_text_changes = 150,
           }
@@ -579,7 +589,7 @@ local function make_config(lsp_status, server)
     else
         config = {
           on_attach = on_attach,
-          capabilities = lsp_status.capabilities,
+          capabilities = capabilities,
           flags = {
               debounce_text_changes = 150,
           }
@@ -592,6 +602,7 @@ end
 local function setup_servers()
   local lsp_installer = require('nvim-lsp-installer')
   local lsp_status = require('lsp-status')
+  local capabilities = require('cmp_nvim_lsp').update_capabilities(vim.lsp.protocol.make_client_capabilities())
   lsp_status.register_progress()
   --snip support for nvim-compe
   lsp_status.capabilities.textDocument.completion.completionItem.snippetSupport = true
@@ -606,7 +617,7 @@ local function setup_servers()
   --    require'lspconfig'[server].setup(make_config(lsp_status, server))
   --end
   lsp_installer.on_server_ready(function(server)
-    local opts = make_config(lsp_status, server) 
+    local opts = make_config(lsp_status, server, capabilities) 
 
     -- (optional) Customize the options passed to the server
     -- if server.name == "tsserver" then
@@ -966,7 +977,7 @@ EOF
 "------------------auto completions setup , nvim-cmp--------------
 lua << EOF
 -- Set completeopt to have a better completion experience
-vim.o.completeopt = 'menu,menuone,noselect'
+vim.opt.completeopt = {'menu','menuone','noselect'}
 
 local has_words_before = function()
   local line, col = unpack(vim.api.nvim_win_get_cursor(0))
@@ -985,7 +996,7 @@ local lspkind = require('lspkind')
     snippet = {
       -- REQUIRED - you must specify a snippet engine
       expand = function(args)
-        vim.fn["vsnip#anonymous"](args.body) -- For `vsnip` users.
+        --vim.fn["vsnip#anonymous"](args.body) -- For `vsnip` users.
         require('luasnip').lsp_expand(args.body) -- For `luasnip` users.
         -- require('snippy').expand_snippet(args.body) -- For `snippy` users.
         -- vim.fn["UltiSnips#Anon"](args.body) -- For `ultisnips` users.
@@ -1006,8 +1017,8 @@ local lspkind = require('lspkind')
           cmp.select_next_item()
         elseif luasnip.expand_or_locally_jumpable() then
           luasnip.expand_or_jump()
-        elseif vim.fn["vsnip#available"](1) == 1 then
-          feedkey("<Plug>(vsnip-expand-or-jump)", "")
+        -- elseif vim.fn["vsnip#available"](1) == 1 then
+        --   feedkey("<Plug>(vsnip-expand-or-jump)", "")
         elseif has_words_before() then
           cmp.complete()
         else
@@ -1019,20 +1030,21 @@ local lspkind = require('lspkind')
           cmp.select_prev_item()
         elseif luasnip.jumpable(-1) then
           luasnip.jump(-1)
-        elseif vim.fn["vsnip#jumpable"](-1) == 1 then
-          feedkey("<Plug>(vsnip-jump-prev)", "")
+        -- elseif vim.fn["vsnip#jumpable"](-1) == 1 then
+        --   feedkey("<Plug>(vsnip-jump-prev)", "")
         end
       end, { "i", "s" }),
     }),
     sources = cmp.config.sources({
       { name = 'nvim_lsp' },
-      { name = 'vsnip' }, -- For vsnip users.
+      { name = "nvim_lsp_signature_help" },
+      -- { name = 'vsnip' }, -- For vsnip users.
       { name = 'luasnip' }, -- For luasnip users.
+      { name = "path" },
       -- { name = 'ultisnips' }, -- For ultisnips users.
       -- { name = 'snippy' }, -- For snippy users.
     }, {
       { name = 'buffer' },
-        -- { name = 'nvim_lsp_signature_help' },
     }),
     view = {                                                        
       entries = {name = 'custom', selection_order = 'near_cursor' } 
@@ -1802,87 +1814,87 @@ EOF
 
 
 "-----------------------------nvim tree setup------------------------------
-let g:nvim_tree_side = 'left' "left by default
-let g:nvim_tree_width = 30 "30 by default, can be width_in_columns or 'width_in_percent%'
-let g:tree_ignore = [ '.git', 'node_modules', '.cache' ] "empty by default
-let g:tree_gitignore = 1 "0 by default
-let g:tree_auto_open = 0 "0 by default, opens the tree when typing `vim $DIR` or `vim`
-let g:tree_auto_close = 1 "0 by default, closes the tree when it's the last window
-let g:nvim_tree_auto_ignore_ft = [] "empty by default, don't auto open tree on specific filetypes.
-let g:nvim_tree_quit_on_open = 1 "0 by default, closes the tree when you open a file
-let g:tree_follow = 1 "0 by default, this option allows the cursor to be updated when entering a buffer
-let g:nvim_tree_indent_markers = 1 "0 by default, this option shows indent markers when folders are open
-let g:tree_hide_dotfiles = 1 "0 by default, this option hides files and folders starting with a dot `.`
-let g:nvim_tree_git_hl = 1 "0 by default, will enable file highlight for git attributes (can be used without the icons).
-let g:nvim_tree_highlight_opened_files = 1 "0 by default, will enable folder and file icon highlight for opened files/directories.
-let g:nvim_tree_root_folder_modifier = ':~' "This is the default. See :help filename-modifiers for more options
-let g:tree_tab_open = 1 "0 by default, will open the tree when entering a new tab and the tree was previously open
-let g:tree_auto_resize = 1 "1 by default, will resize the tree to its saved width when opening a file
-let g:tree_disable_netrw = 0 "1 by default, disables netrw
-let g:tree_hijack_netrw = 0 "1 by default, prevents netrw from automatically opening when opening directories (but lets you keep its other utilities)
-let g:nvim_tree_add_trailing = 0 "0 by default, append a trailing slash to folder names
-let g:nvim_tree_group_empty = 0 " 0 by default, compact folders that only contain a single folder into one node in the file tree
-let g:tree_lsp_diagnostics = 0 "0 by default, will show lsp diagnostics in the signcolumn. See :help nvim_tree_lsp_diagnostics
-let g:nvim_tree_disable_window_picker = 0 "0 by default, will disable the window picker.
-let g:tree_hijack_cursor = 0 "1 by default, when moving cursor in the tree, will position the cursor at the start of the file on the current line
-let g:nvim_tree_icon_padding = ' ' "one space by default, used for rendering the space between the icon and the filename. Use with caution, it could break rendering if you set an empty string depending on your font.
-let g:tree_update_cwd = 0 "0 by default, will update the tree cwd when changing nvim's directory (DirChanged event). Behaves strangely with autochdir set.
-let g:nvim_tree_window_picker_exclude = {
-    \   'filetype': [
-    \     'packer',
-    \     'qf'
-    \   ],
-    \   'buftype': [
-    \     'terminal'
-    \   ]
-    \ }
-" Dictionary of buffer option names mapped to a list of option values that
-" indicates to the window picker that the buffer's window should not be
-" selectable.
-let g:nvim_tree_special_files = { 'README.md': 1, 'Makefile': 1, 'MAKEFILE': 1 } " List of filenames that gets highlighted with NvimTreeSpecialFile
-let g:nvim_tree_show_icons = {
-    \ 'git': 1,
-    \ 'folders': 1,
-    \ 'files': 1,
-    \ 'folder_arrows': 1,
-    \ }
-"If 0, do not show the icons for one of 'git' 'folder' and 'files'
-"1 by default, notice that if 'files' is 1, it will only display
-"if nvim-web-devicons is installed and on your runtimepath.
-"if folder is 1, you can also tell folder_arrows 1 to show small arrows next to the folder icons.
-"but this will not work when you set indent_markers (because of UI conflict)
-
-" default will show icon by default if no icon is provided
-" default shows no icon by default
-let g:nvim_tree_icons = {
-    \ 'default': '',
-    \ 'symlink': '',
-    \ 'git': {
-    \   'unstaged': "✗",
-    \   'staged': "✓",
-    \   'unmerged': "",
-    \   'renamed': "➜",
-    \   'untracked': "★",
-    \   'deleted': "",
-    \   'ignored': "◌"
-    \   },
-    \ 'folder': {
-    \   'arrow_open': "",
-    \   'arrow_closed': "",
-    \   'default': "",
-    \   'open': "",
-    \   'empty': "",
-    \   'empty_open': "",
-    \   'symlink': "",
-    \   'symlink_open': "",
-    \   },
-    \   'lsp': {
-    \     'hint': "",
-    \     'info': "",
-    \     'warning': "",
-    \     'error': "",
-    \   }
-    \ }
+" let g:nvim_tree_side = 'left' "left by default
+" let g:nvim_tree_width = 30 "30 by default, can be width_in_columns or 'width_in_percent%'
+" let g:tree_ignore = [ '.git', 'node_modules', '.cache' ] "empty by default
+" let g:tree_gitignore = 1 "0 by default
+" let g:tree_auto_open = 0 "0 by default, opens the tree when typing `vim $DIR` or `vim`
+" let g:tree_auto_close = 1 "0 by default, closes the tree when it's the last window
+" let g:nvim_tree_auto_ignore_ft = [] "empty by default, don't auto open tree on specific filetypes.
+" let g:nvim_tree_quit_on_open = 1 "0 by default, closes the tree when you open a file
+" let g:tree_follow = 1 "0 by default, this option allows the cursor to be updated when entering a buffer
+" let g:nvim_tree_indent_markers = 1 "0 by default, this option shows indent markers when folders are open
+" let g:tree_hide_dotfiles = 1 "0 by default, this option hides files and folders starting with a dot `.`
+" let g:nvim_tree_git_hl = 1 "0 by default, will enable file highlight for git attributes (can be used without the icons).
+" let g:nvim_tree_highlight_opened_files = 1 "0 by default, will enable folder and file icon highlight for opened files/directories.
+" let g:nvim_tree_root_folder_modifier = ':~' "This is the default. See :help filename-modifiers for more options
+" let g:tree_tab_open = 1 "0 by default, will open the tree when entering a new tab and the tree was previously open
+" let g:tree_auto_resize = 1 "1 by default, will resize the tree to its saved width when opening a file
+" let g:tree_disable_netrw = 0 "1 by default, disables netrw
+" let g:tree_hijack_netrw = 0 "1 by default, prevents netrw from automatically opening when opening directories (but lets you keep its other utilities)
+" let g:nvim_tree_add_trailing = 0 "0 by default, append a trailing slash to folder names
+" let g:nvim_tree_group_empty = 0 " 0 by default, compact folders that only contain a single folder into one node in the file tree
+" let g:tree_lsp_diagnostics = 0 "0 by default, will show lsp diagnostics in the signcolumn. See :help nvim_tree_lsp_diagnostics
+" let g:nvim_tree_disable_window_picker = 0 "0 by default, will disable the window picker.
+" let g:tree_hijack_cursor = 0 "1 by default, when moving cursor in the tree, will position the cursor at the start of the file on the current line
+" let g:nvim_tree_icon_padding = ' ' "one space by default, used for rendering the space between the icon and the filename. Use with caution, it could break rendering if you set an empty string depending on your font.
+" let g:tree_update_cwd = 0 "0 by default, will update the tree cwd when changing nvim's directory (DirChanged event). Behaves strangely with autochdir set.
+" let g:nvim_tree_window_picker_exclude = {
+"     \   'filetype': [
+"     \     'packer',
+"     \     'qf'
+"     \   ],
+"     \   'buftype': [
+"     \     'terminal'
+"     \   ]
+"     \ }
+" " Dictionary of buffer option names mapped to a list of option values that
+" " indicates to the window picker that the buffer's window should not be
+" " selectable.
+" let g:nvim_tree_special_files = { 'README.md': 1, 'Makefile': 1, 'MAKEFILE': 1 } " List of filenames that gets highlighted with NvimTreeSpecialFile
+" let g:nvim_tree_show_icons = {
+"     \ 'git': 1,
+"     \ 'folders': 1,
+"     \ 'files': 1,
+"     \ 'folder_arrows': 1,
+"     \ }
+" "If 0, do not show the icons for one of 'git' 'folder' and 'files'
+" "1 by default, notice that if 'files' is 1, it will only display
+" "if nvim-web-devicons is installed and on your runtimepath.
+" "if folder is 1, you can also tell folder_arrows 1 to show small arrows next to the folder icons.
+" "but this will not work when you set indent_markers (because of UI conflict)
+"
+" " default will show icon by default if no icon is provided
+" " default shows no icon by default
+" let g:nvim_tree_icons = {
+"     \ 'default': '',
+"     \ 'symlink': '',
+"     \ 'git': {
+"     \   'unstaged': "✗",
+"     \   'staged': "✓",
+"     \   'unmerged': "",
+"     \   'renamed': "➜",
+"     \   'untracked': "★",
+"     \   'deleted': "",
+"     \   'ignored': "◌"
+"     \   },
+"     \ 'folder': {
+"     \   'arrow_open': "",
+"     \   'arrow_closed': "",
+"     \   'default': "",
+"     \   'open': "",
+"     \   'empty': "",
+"     \   'empty_open': "",
+"     \   'symlink': "",
+"     \   'symlink_open': "",
+"     \   },
+"     \   'lsp': {
+"     \     'hint': "",
+"     \     'info': "",
+"     \     'warning': "",
+"     \     'error': "",
+"     \   }
+"     \ }
 
 nnoremap <silent><leader><C-n> :NvimTreeToggle<CR>
 nnoremap <silent><leader>r :NvimTreeRefresh<CR>
@@ -1893,7 +1905,16 @@ nnoremap <silent><leader>n :NvimTreeFindFile<CR>
 
 " a list of groups can be found at `:help nvim_tree_highlight`
 highlight NvimTreeFolderIcon guibg=blue
-
+lua <<EOF
+require("nvim-tree").setup({
+  sync_root_with_cwd = true,
+  respect_buf_cwd = true,
+  update_focused_file = {
+    enable = true,
+    update_root = true
+  },
+})
+EOF
 "--------------------------symbol outline setup , tagbar----------------
 lua <<EOF
 vim.g.symbols_outline = {
@@ -1980,5 +2001,20 @@ require('auto-session').setup {
     auto_session_enable_last_session=false,
     auto_restore_enable=false
 }
+-- require('session-lens').search_session()
 EOF
 
+"---------project management-----
+lua <<EOF
+require("project_nvim").setup{}
+require('telescope').load_extension('projects')
+-- require('session-lens').setup({})
+-- require("telescope").load_extension("session-lens")
+EOF
+
+"---------vim-visual-multi---------
+let g:VM_mouse_mappings = 1
+set mouse=a
+
+"--------live server Bracey-------
+"
