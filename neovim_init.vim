@@ -112,7 +112,7 @@ Plug 'ray-x/lsp_signature.nvim'
 "lsp language server installer
 Plug 'williamboman/nvim-lsp-installer'
 "lsp rooter , change current dir to project root
-Plug 'ahmedkhalf/lsp-rooter.nvim'
+Plug 'ahmedkhalf/lsp-rooter.nvim' "insted use project.nvim
 "trouble window
 Plug 'folke/trouble.nvim'
 
@@ -602,7 +602,7 @@ end
 local function setup_servers()
   local lsp_installer = require('nvim-lsp-installer')
   local lsp_status = require('lsp-status')
-  local capabilities = require('cmp_nvim_lsp').update_capabilities(vim.lsp.protocol.make_client_capabilities())
+  local capabilities = require('cmp_nvim_lsp').default_capabilities(vim.lsp.protocol.make_client_capabilities())
   lsp_status.register_progress()
   --snip support for nvim-compe
   lsp_status.capabilities.textDocument.completion.completionItem.snippetSupport = true
@@ -1913,6 +1913,10 @@ require("nvim-tree").setup({
     enable = true,
     update_root = true
   },
+  view = {
+    number = false,
+    relativenumber = false,
+  }
 })
 EOF
 "--------------------------symbol outline setup , tagbar----------------
